@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+import io
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.cluster import KMeans
@@ -18,11 +19,15 @@ if uploaded_file is not None:
     st.subheader("Dataset Preview")
     st.dataframe(customer_data.head())
 
+
+
+
     st.write("### Dataset Info")
-    buffer = []
+    buffer = io.StringIO()
     customer_data.info(buf=buffer)
-    s = '\n'.join(buffer)
+    s = buffer.getvalue()
     st.code(s)
+
 
     st.write("### Checking for Missing Values")
     st.write(customer_data.isnull().sum())
