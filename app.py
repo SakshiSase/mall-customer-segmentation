@@ -116,5 +116,5 @@ elif options == "Visualization":
 
 # Footer
 st.markdown("---")
-st.caption("Developed by [Your Name] • Powered by Streamlit")
+st.caption("Developed by APPE Company • Powered by Streamlit")
 
