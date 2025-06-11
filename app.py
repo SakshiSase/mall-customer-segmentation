@@ -1,89 +1,120 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import io
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.cluster import KMeans
+import io
 
-st.set_page_config(page_title="Mall Customer Segmentation", layout="centered")
+# Page configuration
+st.set_page_config(page_title="Customer Segmentation", layout="wide")
 
-st.title("Mall Customer Segmentation using KMeans")
+# Custom CSS styling
+st.markdown("""
+    <style>
+    .main {background-color: #F8F9FA;}
+    h1, h2, h3 {color: #333;}
+    </style>
+    """, unsafe_allow_html=True)
 
-uploaded_file = st.file_uploader("Upload Mall_Customers.csv file", type=["csv"])
+st.title("🛍️ Mall Customer Segmentation App")
 
-if uploaded_file is not None:
-    customer_data = pd.read_csv(uploaded_file)
-    st.success("File Uploaded Successfully!")
+# Sidebar navigation
+st.sidebar.title("Navigation")
+options = st.sidebar.radio("Go to", ["Upload Dataset", "Data Overview", "Clustering", "Visualization"])
 
-    st.subheader("Dataset Preview")
-    st.dataframe(customer_data.head())
+# Upload dataset
+if options == "Upload Dataset":
+    st.header("Upload Your Dataset (CSV)")
+    uploaded_file = st.file_uploader("Choose a file", type="csv")
 
+    if uploaded_file is not None:
+        customer_data = pd.read_csv(uploaded_file)
+        st.success("✅ File uploaded successfully!")
+        st.session_state['data'] = customer_data
+        st.dataframe(customer_data.head())
 
+elif options == "Data Overview":
+    st.header("Dataset Overview")
 
+    if 'data' in st.session_state:
+        customer_data = st.session_state['data']
+        st.subheader("Dataset Preview")
+        st.dataframe(customer_data.head())
 
-    st.write("### Dataset Info")
-    buffer = io.StringIO()
-    customer_data.info(buf=buffer)
-    s = buffer.getvalue()
-    st.code(s)
+        st.subheader("Basic Information")
+        buffer = io.StringIO()
+        customer_data.info(buf=buffer)
+        s = buffer.getvalue()
+        st.code(s)
 
+        st.subheader("Missing Values")
+        st.dataframe(customer_data.isnull().sum())
+    else:
+        st.warning("⚠️ Please upload a dataset first in the 'Upload Dataset' section.")
 
-    st.write("### Checking for Missing Values")
-    st.write(customer_data.isnull().sum())
+elif options == "Clustering":
+    st.header("Apply K-Means Clustering")
 
-    # Selecting features for clustering
-    X = customer_data.iloc[:, [3, 4]].values
+    if 'data' in st.session_state:
+        customer_data = st.session_state['data']
 
-    # Elbow Method to find optimal k
-    st.subheader("Elbow Method to Find Optimal Number of Clusters (k)")
-    wcss = []
-    for i in range(1, 11):
-        kmeans = KMeans(n_clusters=i, init='k-means++', random_state=42)
-        kmeans.fit(X)
-        wcss.append(kmeans.inertia_)
+        X = customer_data.iloc[:, [3, 4]].values
 
-    fig, ax = plt.subplots()
-    sns.set()
-    ax.plot(range(1, 11), wcss, marker='o')
-    ax.set_title('The Elbow Method')
-    ax.set_xlabel('Number of Clusters')
-    ax.set_ylabel('WCSS')
-    st.pyplot(fig)
+        wcss = []
+        for i in range(1, 11):
+            kmeans = KMeans(n_clusters=i, init='k-means++', random_state=42)
+            kmeans.fit(X)
+            wcss.append(kmeans.inertia_)
 
-    # Select k using slider (default 5 like your code)
-    k = st.slider("Select number of clusters (k)", min_value=2, max_value=10, value=5)
+        st.subheader("Elbow Method Graph")
+        fig, ax = plt.subplots()
+        sns.set()
+        ax.plot(range(1, 11), wcss, marker='o', linestyle='--')
+        ax.set_title('The Elbow Point Graph')
+        ax.set_xlabel('Number of Clusters')
+        ax.set_ylabel('WCSS')
+        st.pyplot(fig)
 
-    # Apply KMeans
-    kmeans = KMeans(n_clusters=k, init='k-means++', random_state=42)
-    Y = kmeans.fit_predict(X)
+        num_clusters = st.slider("Select Number of Clusters", min_value=2, max_value=10, value=5)
+        kmeans = KMeans(n_clusters=num_clusters, init='k-means++', random_state=0)
+        Y = kmeans.fit_predict(X)
 
-    st.subheader("Cluster Labels")
-    st.write(Y)
+        st.session_state['X'] = X
+        st.session_state['Y'] = Y
+        st.session_state['kmeans'] = kmeans
 
-    # Plotting Clusters
-    st.subheader("Visualization of Clusters and Centroids")
-    fig2, ax2 = plt.subplots(figsize=(8, 6))
-    colors = ['green', 'red', 'yellow', 'violet', 'blue', 'orange', 'brown', 'pink', 'gray', 'purple']
+    else:
+        st.warning("⚠️ Please upload a dataset first in the 'Upload Dataset' section.")
 
-    for i in range(k):
-        ax2.scatter(X[Y == i, 0], X[Y == i, 1], s=50, c=colors[i], label=f'Cluster {i+1}')
-    
-    # Centroids
-    ax2.scatter(kmeans.cluster_centers_[:, 0], kmeans.cluster_centers_[:, 1], s=200, c='cyan', marker='X', label='Centroids')
+elif options == "Visualization":
+    st.header("Customer Clusters Visualization")
 
-    ax2.set_title("Customer Groups")
-    ax2.set_xlabel("Annual Income (k$)")
-    ax2.set_ylabel("Spending Score (1-100)")
-    ax2.legend()
-    st.pyplot(fig2)
+    if 'X' in st.session_state and 'Y' in st.session_state and 'kmeans' in st.session_state:
+        X = st.session_state['X']
+        Y = st.session_state['Y']
+        kmeans = st.session_state['kmeans']
 
-    # Download clustered data
-    result_df = customer_data.copy()
-    result_df['Cluster'] = Y
-    csv = result_df.to_csv(index=False).encode('utf-8')
-    st.download_button("Download Clustered Data", data=csv, file_name='clustered_customers.csv', mime='text/csv')
+        fig, ax = plt.subplots(figsize=(8, 6))
 
-else:
-    st.info("Upload the dataset to start clustering.")
+        colors = ['green', 'red', 'yellow', 'violet', 'blue', 'orange', 'pink', 'purple', 'brown', 'gray']
+
+        for cluster in np.unique(Y):
+            ax.scatter(X[Y == cluster, 0], X[Y == cluster, 1], 
+                       s=70, c=colors[cluster % len(colors)], label=f'Cluster {cluster + 1}')
+
+        ax.scatter(kmeans.cluster_centers_[:, 0], kmeans.cluster_centers_[:, 1],
+                   s=200, c='black', marker='X', label='Centroids')
+        ax.set_title("Customer Segmentation Clusters")
+        ax.set_xlabel("Annual Income")
+        ax.set_ylabel("Spending Score")
+        ax.legend()
+        st.pyplot(fig)
+
+    else:
+        st.warning("⚠️ Please perform clustering first in the 'Clustering' section.")
+
+# Footer
+st.markdown("---")
+st.caption("Developed by [Your Name] • Powered by Streamlit")
 
